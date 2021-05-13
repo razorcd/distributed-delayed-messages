@@ -71,11 +71,8 @@ public class App {
         final KStream<String, String> input = builder.stream(INPUT_TOPIC);
 
         input.peek((k,v) -> System.out.println("Input value: "+v))
-//             .selectKey((k, v) -> "111")
-//             .groupByKey()
-//             .reduce((v1, v2) -> v2)
              .transform(new DistributedSchedulerTransformerSupplier(distributedSchedulerStore.name(), clock), distributedSchedulerStore.name())
-//             .filterNot((k,v) -> v==null)
+             .filterNot((k,v) -> v==null)
              .peek((k,v) -> System.out.println("Output value: "+v))
              .to(OUTPUT_TOPIC);
 
