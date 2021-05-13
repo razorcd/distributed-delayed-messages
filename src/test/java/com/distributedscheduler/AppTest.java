@@ -3,10 +3,7 @@ package com.distributedscheduler;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.TestInputTopic;
-import org.apache.kafka.streams.TestOutputTopic;
-import org.apache.kafka.streams.TopologyTestDriver;
+import org.apache.kafka.streams.*;
 import org.junit.jupiter.api.Test;
 
 import java.util.Properties;
@@ -31,9 +28,17 @@ class AppTest {
             final TestOutputTopic<String, String> output = topologyTestDriver
                     .createOutputTopic(App.OUTPUT_TOPIC, new StringDeserializer(), new StringDeserializer());
 
-            input.pipeInput("111", "{}");
 
-            assertEquals("_", output.readValue());
+            String event = "{" +
+                        "\"type\": \"Delayed\"," +
+                        "\"publishAt\": \"2021-05-12T23:20:50.52Z\"," +
+                        "\"message\": \"message1\"," +
+                        "\"partitionKey\": \"42\"" +
+                    "}";
+
+            input.pipeInput("111", event);
+
+            assertEquals(KeyValue.pair("42", "message1"), output.readKeyValue());
         }
     }
 

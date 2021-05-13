@@ -1,5 +1,9 @@
 package com.distributedscheduler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
@@ -13,8 +17,10 @@ import org.apache.kafka.streams.state.Stores;
 
 import java.util.Optional;
 import java.util.Properties;
+import java.util.function.Function;
 
 public class App {
+    static final ObjectMapper objectMapper = new ObjectMapper().registerModule(new Jdk8Module()).registerModule(new JavaTimeModule());
 
     static final String OUTPUT_TOPIC = "distributed-scheduler-output";
     static final String INPUT_TOPIC = "distributed-scheduler-input";
@@ -27,6 +33,8 @@ public class App {
             .withCachingEnabled();
 
     public static void main(final String[] args) {
+
+
         final String bootstrapServers = args.length > 0 ? args[0] : "localhost:9092";
         final Properties streamsConfiguration = new Properties();
 
@@ -79,6 +87,15 @@ public class App {
 
         @Override
         public Transformer<String, String, KeyValue<String, String>> get() {
+            Function<String, DelayedCommand> deserialize = (json) -> {
+                try {
+                    return objectMapper.readValue(json, DelayedCommand.class);
+                } catch (JsonProcessingException e) {
+                    throw new RuntimeException("Error deserialising json: "+json);
+                }
+            };
+
+
             return new Transformer<String, String, KeyValue<String, String>>() {
 
                 private KeyValueStore<String, String> stateStore;
@@ -96,7 +113,10 @@ public class App {
                     // words.
                     final Optional<String> count = Optional.ofNullable(stateStore.get(value));
                     stateStore.put(value, count.orElse("_"));
-                    return KeyValue.pair(value, count.orElse("_"));
+
+                    DelayedCommand command = deserialize.apply(value);
+
+                    return KeyValue.pair(command.getPartitionKey(), command.getMessage());
                 }
 
                 @Override
