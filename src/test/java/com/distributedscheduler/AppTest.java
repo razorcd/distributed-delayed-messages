@@ -6,13 +6,16 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.*;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Properties;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
+
 class AppTest {
 
     @Test
-    public void test1() {
+    public void test1() throws InterruptedException {
         final Properties streamsConfiguration = new Properties();
         streamsConfiguration.put(StreamsConfig.APPLICATION_ID_CONFIG, "distributed-scheduler-test");
         streamsConfiguration.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy config");
@@ -23,7 +26,7 @@ class AppTest {
 
         try (final TopologyTestDriver topologyTestDriver = new TopologyTestDriver(App.getTopology(), streamsConfiguration)) {
             final TestInputTopic<String, String> input = topologyTestDriver
-                    .createInputTopic(App.INPUT_TOPIC, new StringSerializer(), new StringSerializer());
+                    .createInputTopic(App.INPUT_TOPIC, new StringSerializer(), new StringSerializer(), Instant.EPOCH, Duration.ofMillis(1));
 
             final TestOutputTopic<String, String> output = topologyTestDriver
                     .createOutputTopic(App.OUTPUT_TOPIC, new StringDeserializer(), new StringDeserializer());
@@ -38,7 +41,15 @@ class AppTest {
 
             input.pipeInput("111", event);
 
+//            topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(60));
+
+//            assertTrue(output.isEmpty());
+            assertNull(output.readValue());
+
+            topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
+
             assertEquals(KeyValue.pair("42", "message1"), output.readKeyValue());
+            assertTrue(output.isEmpty());
         }
     }
 

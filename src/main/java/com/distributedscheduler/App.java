@@ -11,19 +11,22 @@ import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Transformer;
 import org.apache.kafka.streams.kstream.TransformerSupplier;
 import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.processor.PunctuationType;
+import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 
-import java.util.Optional;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Properties;
 import java.util.function.Function;
 
 public class App {
     static final ObjectMapper objectMapper = new ObjectMapper().registerModule(new Jdk8Module()).registerModule(new JavaTimeModule());
 
-    static final String OUTPUT_TOPIC = "distributed-scheduler-output";
     static final String INPUT_TOPIC = "distributed-scheduler-input";
+    static final String OUTPUT_TOPIC = "distributed-scheduler-output";
 
     static final StoreBuilder<KeyValueStore<String, String>> distributedSchedulerStore = Stores
             .keyValueStoreBuilder(
@@ -70,6 +73,7 @@ public class App {
 //             .groupByKey()
 //             .reduce((v1, v2) -> v2)
              .transform(new DistributedSchedulerTransformerSupplier(distributedSchedulerStore.name()), distributedSchedulerStore.name())
+//             .filterNot((k,v) -> v==null)
              .peek((k,v) -> System.out.println("Output value: "+v))
              .to(OUTPUT_TOPIC);
 
@@ -99,24 +103,35 @@ public class App {
             return new Transformer<String, String, KeyValue<String, String>>() {
 
                 private KeyValueStore<String, String> stateStore;
+                private ProcessorContext context;
 
                 @SuppressWarnings("unchecked")
                 @Override
                 public void init(final ProcessorContext context) {
                     stateStore = (KeyValueStore<String, String>) context.getStateStore(stateStoreName);
+
+                    this.context = context;
+
+                    this.context.schedule(Duration.ofSeconds(1), PunctuationType.WALL_CLOCK_TIME,
+                            timestamp -> {
+                                System.out.println(".");
+                                try (KeyValueIterator<String, String> iterator = stateStore.all()) {
+                                    while (iterator.hasNext()) {
+                                        KeyValue<String, String> keyValue = iterator.next();
+                                        DelayedCommand command = deserialize.apply(keyValue.value);
+
+//                                        if (command.getPublishAt().isBefore(Instant.now())) {
+                                            context.forward(command.getPartitionKey(), command.getMessage());
+//                                        }
+                                    }
+                                }
+                            });
                 }
 
                 @Override
                 public KeyValue<String, String> transform(final String key, final String value) {
-                    // For simplification (and unlike the traditional wordcount) we assume that the value is
-                    // a single word, i.e. we don't split the value by whitespace into potentially one or more
-                    // words.
-                    final Optional<String> count = Optional.ofNullable(stateStore.get(value));
-                    stateStore.put(value, count.orElse("_"));
-
-                    DelayedCommand command = deserialize.apply(value);
-
-                    return KeyValue.pair(command.getPartitionKey(), command.getMessage());
+                    stateStore.put(key, value);
+                    return KeyValue.pair(null,null);
                 }
 
                 @Override
