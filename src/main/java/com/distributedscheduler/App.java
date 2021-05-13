@@ -17,12 +17,14 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Properties;
 import java.util.function.Function;
 
 public class App {
+    static final Clock CLOCK = Clock.systemUTC();
     static final ObjectMapper objectMapper = new ObjectMapper().registerModule(new Jdk8Module()).registerModule(new JavaTimeModule());
 
     static final String INPUT_TOPIC = "distributed-scheduler-input";
@@ -53,7 +55,7 @@ public class App {
 
         streamsConfiguration.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 10 * 1000);
 
-        final Topology topology = getTopology();
+        final Topology topology = getTopology(CLOCK);
         final KafkaStreams streams = new KafkaStreams(topology, streamsConfiguration);
 
         streams.cleanUp();
@@ -62,7 +64,7 @@ public class App {
         Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
     }
 
-    static Topology getTopology() {
+    static Topology getTopology(Clock clock) {
         final StreamsBuilder builder = new StreamsBuilder();
         builder.addStateStore(distributedSchedulerStore);
 
@@ -72,7 +74,7 @@ public class App {
 //             .selectKey((k, v) -> "111")
 //             .groupByKey()
 //             .reduce((v1, v2) -> v2)
-             .transform(new DistributedSchedulerTransformerSupplier(distributedSchedulerStore.name()), distributedSchedulerStore.name())
+             .transform(new DistributedSchedulerTransformerSupplier(distributedSchedulerStore.name(), clock), distributedSchedulerStore.name())
 //             .filterNot((k,v) -> v==null)
              .peek((k,v) -> System.out.println("Output value: "+v))
              .to(OUTPUT_TOPIC);
@@ -84,9 +86,11 @@ public class App {
     private static final class DistributedSchedulerTransformerSupplier implements TransformerSupplier<String, String, KeyValue<String, String>> {
 
         final private String stateStoreName;
+        final private Clock clock;
 
-        DistributedSchedulerTransformerSupplier(final String stateStoreName) {
+        DistributedSchedulerTransformerSupplier(final String stateStoreName, final Clock clock) {
             this.stateStoreName = stateStoreName;
+            this.clock = clock;
         }
 
         @Override
@@ -120,9 +124,9 @@ public class App {
                                         KeyValue<String, String> keyValue = iterator.next();
                                         DelayedCommand command = deserialize.apply(keyValue.value);
 
-//                                        if (command.getPublishAt().isBefore(Instant.now())) {
+                                        if (command.getPublishAt().isBefore(Instant.now(clock))) {
                                             context.forward(command.getPartitionKey(), command.getMessage());
-//                                        }
+                                        }
                                     }
                                 }
                             });
