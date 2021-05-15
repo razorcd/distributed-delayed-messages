@@ -20,6 +20,9 @@ import org.apache.kafka.streams.state.Stores;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoField;
+import java.util.Date;
 import java.util.Properties;
 import java.util.function.Function;
 
@@ -82,8 +85,10 @@ public class App {
 
     private static final class DistributedSchedulerTransformerSupplier implements TransformerSupplier<String, String, KeyValue<String, String>> {
 
-        final private String stateStoreName;
-        final private Clock clock;
+        private static final Duration SCHEDULER_PERIOD = Duration.ofSeconds(10);
+
+        private final String stateStoreName;
+        private final Clock clock;
 
         DistributedSchedulerTransformerSupplier(final String stateStoreName, final Clock clock) {
             this.stateStoreName = stateStoreName;
@@ -113,22 +118,25 @@ public class App {
 
                     this.context = context;
 
-                    this.context.schedule(Duration.ofSeconds(10), PunctuationType.WALL_CLOCK_TIME,
-                            timestamp -> {
-                                System.out.println(".");
-                                try (KeyValueIterator<String, String> iterator = stateStore.all()) {
-                                    while (iterator.hasNext()) {
-                                        KeyValue<String, String> keyValue = iterator.next();
-                                        DelayedCommand command = deserialize.apply(keyValue.value);
+                    this.context.schedule(SCHEDULER_PERIOD, PunctuationType.WALL_CLOCK_TIME, timestamp -> {
+                        long processingStartTimeMs = System.currentTimeMillis();
+                        System.out.println(".");
+                        try (KeyValueIterator<String, String> iterator = stateStore.all()) {
+                            while (iterator.hasNext()) {
+                                KeyValue<String, String> keyValue = iterator.next();
+                                DelayedCommand command = deserialize.apply(keyValue.value);
 
-                                        Instant now = Instant.now(clock);
-                                        if (command.getPublishAt().isBefore(now) || command.getPublishAt().equals(now)) {
-                                            context.forward(command.getPartitionKey(), command.getMessage());
-                                            stateStore.delete(keyValue.key);
-                                        }
-                                    }
+                                Instant now = Instant.now(clock);
+                                if (command.getPublishAt().isBefore(now) || command.getPublishAt().equals(now)) {
+                                    context.forward(command.getPartitionKey(), command.getMessage());
+                                    stateStore.delete(keyValue.key);
                                 }
-                            });
+                            }
+                        }
+
+                        long processDurationMs = System.currentTimeMillis() - processingStartTimeMs;
+                        if (processDurationMs > SCHEDULER_PERIOD.toMillis()) System.out.println("Warning: Scheduler processing duration took "+processDurationMs+" ms, when SCHEDULER_PERIOD="+SCHEDULER_PERIOD.toMillis()+" ms.");
+                    });
                 }
 
                 @Override
