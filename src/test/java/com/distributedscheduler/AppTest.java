@@ -4,6 +4,7 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.*;
+import org.apache.kafka.streams.state.KeyValueStore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,8 +17,7 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoField;
 import java.util.Properties;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
@@ -29,6 +29,7 @@ class AppTest {
     TestInputTopic<String, String> input;
     TestOutputTopic<String, String> output;
     TopologyTestDriver topologyTestDriver;
+    KeyValueStore<String, String> store;
 
     @BeforeEach
     void setUp() {
@@ -39,10 +40,11 @@ class AppTest {
         streamsConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         streamsConfiguration.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/distributed-scheduler-test");
 
-
         this.topologyTestDriver = new TopologyTestDriver(App.getTopology(clock), streamsConfiguration);
         input = topologyTestDriver.createInputTopic(App.INPUT_TOPIC, new StringSerializer(), new StringSerializer(), Instant.EPOCH, Duration.ofMillis(1));
         output = topologyTestDriver.createOutputTopic(App.OUTPUT_TOPIC, new StringDeserializer(), new StringDeserializer());
+
+        store = topologyTestDriver.getKeyValueStore("distributed-scheduler-store");
     }
 
     @AfterEach
@@ -59,7 +61,6 @@ class AppTest {
         //when
         String event = createDelayedEvent(nowPlus20SecInstant, "message1", "42");
         input.pipeInput("111", event);
-        Thread.sleep(1000);
 
         //then don't publish yet
         MockedStatic instantMock = mockStatic(Instant.class);
@@ -68,6 +69,7 @@ class AppTest {
         instantMock.when(() -> Instant.now(clock)).thenReturn(now);
         topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
         assertTrue(output.isEmpty());
+        assertNotNull(store.get("111"));
 
         //and when
         instantMock.when(() -> Instant.now(clock)).thenReturn(nowPlus20SecInstant);
@@ -75,6 +77,7 @@ class AppTest {
 
         //then publish it
         assertEquals(KeyValue.pair("42", "message1"), output.readKeyValue());
+        assertNull(store.get("111"));
 
         //and when
         instantMock.when(() -> Instant.now(clock)).thenReturn(nowPlus30SecInstant);
@@ -82,6 +85,7 @@ class AppTest {
 
         //then publish nothing else
         assertTrue(output.isEmpty());
+        assertNull(store.get("111"));
 
         //finally
         instantMock.verify(times(2), () -> Instant.now(clock));
