@@ -113,7 +113,7 @@ public class App {
 
                     this.context = context;
 
-                    this.context.schedule(Duration.ofSeconds(1), PunctuationType.WALL_CLOCK_TIME,
+                    this.context.schedule(Duration.ofSeconds(10), PunctuationType.WALL_CLOCK_TIME,
                             timestamp -> {
                                 System.out.println(".");
                                 try (KeyValueIterator<String, String> iterator = stateStore.all()) {
@@ -121,8 +121,10 @@ public class App {
                                         KeyValue<String, String> keyValue = iterator.next();
                                         DelayedCommand command = deserialize.apply(keyValue.value);
 
-                                        if (command.getPublishAt().isBefore(Instant.now(clock))) {
+                                        Instant now = Instant.now(clock);
+                                        if (command.getPublishAt().isBefore(now) || command.getPublishAt().equals(now)) {
                                             context.forward(command.getPartitionKey(), command.getMessage());
+                                            stateStore.delete(keyValue.key);
                                         }
                                     }
                                 }
