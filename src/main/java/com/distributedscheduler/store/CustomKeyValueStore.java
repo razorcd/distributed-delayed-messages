@@ -1,35 +1,25 @@
 package com.distributedscheduler.store;
 
-import com.mongodb.BasicDBObject;
-import com.mongodb.DBObject;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.result.DeleteResult;
-import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
-import org.apache.kafka.streams.processor.StateStoreContext;
 import org.apache.kafka.streams.processor.TaskId;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.internals.DelegatingPeekingKeyValueIterator;
-import org.bson.BsonDocument;
-import org.bson.BsonValue;
 import org.bson.Document;
-import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
-
-    private static final Logger LOG = LoggerFactory.getLogger(com.distributedscheduler.store.CustomKeyValueStore.class);
 
     private final String name;
     private final MongoClient mongoClient;
@@ -37,7 +27,6 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
     private MongoCollection<Document> databaseCollection;
 
 
-//    private final NavigableMap<Bytes, byte[]> map = new TreeMap<>();
     private volatile boolean open = false;
     private long size = 0L; // SkipListMap#size is O(N) so we just do our best to track it
 
@@ -54,13 +43,11 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
     @Deprecated
     @Override
-    public void init(final ProcessorContext context,
-                     final StateStore root) {
+    public void init(final ProcessorContext context, final StateStore root) {
         TaskId taskId = context.taskId();
         String collectionName = String.valueOf(taskId.partition);
         database.createCollection(collectionName);
         databaseCollection = database.getCollection(collectionName);
-
 
         size = 0;
         if (root != null) {
@@ -77,7 +64,7 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
     @Override
     public boolean persistent() {
-        return false;
+        return true;
     }
 
     @Override
@@ -87,7 +74,6 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
     @Override
     public synchronized byte[] get(final Bytes key) {
-//        return map.get(key);
         Document document = databaseCollection.find(new Document("_id", key.toString())).first();
         return document==null ? null : String.valueOf(document.get("value")).getBytes();
     }
@@ -95,12 +81,12 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
     @Override
     public synchronized void put(final Bytes key, final byte[] value) {
         if (value == null) {
-//            size -= map.remove(key) == null ? 0 : 1;
-            databaseCollection.deleteOne(new Document("_id", key.toString()));
+            DeleteResult deleteResult = databaseCollection.deleteOne(new Document("_id", key.toString()));
+            size -= deleteResult.getDeletedCount();
         } else {
-//            size += map.put(key, value) == null ? 1 : 0;
             String stringValue = new String(value, StandardCharsets.UTF_8);
             databaseCollection.insertOne(new Document("_id", key.toString()).append("value", stringValue));
+            size ++;
         }
     }
 
@@ -115,11 +101,13 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
     @Override
     public void putAll(final List<KeyValue<Bytes, byte[]>> entries) {
-        for (final KeyValue<Bytes, byte[]> entry : entries) {
-            put(entry.key, entry.value);
-        }
+        List<Document> documentList = entries.stream()
+                .map(kv -> new Document("_id", kv.key.toString()).append("value", new String(kv.value, StandardCharsets.UTF_8)))
+                .collect(Collectors.toList());
+        databaseCollection.insertMany(documentList);
+        size += documentList.size();
     }
-//
+
 //    @Override
 //    public <PS extends Serializer<P>, P> KeyValueIterator<Bytes, byte[]> prefixScan(final P prefix, final PS prefixKeySerializer) {
 //        Objects.requireNonNull(prefix, "prefix cannot be null");
@@ -136,8 +124,6 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
     @Override
     public synchronized byte[] delete(final Bytes key) {
-//        final byte[] oldValue = map.remove(key);
-//        size -= oldValue == null ? 0 : 1;
         Document deletedDocument = databaseCollection.findOneAndDelete(new Document("_id", key.toString()));
         size -= deletedDocument == null ? 0 : 1;
         return String.valueOf(deletedDocument.get("_id")).getBytes();
@@ -155,7 +141,7 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
     private KeyValueIterator<Bytes, byte[]> range(final Bytes from, final Bytes to, final boolean forward) {
 
-        throw new UnsupportedOperationException("Range not ready yet");
+        throw new UnsupportedOperationException("Range not implemented.");
 //
 //        if (from.compareTo(to) > 0) {
 //            LOG.warn("Returning empty iterator for fetch with invalid key range: from > to. " +
@@ -180,10 +166,7 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
     @Override
     public synchronized KeyValueIterator<Bytes, byte[]> reverseAll() {
-        return new DelegatingPeekingKeyValueIterator<>(
-                name,
-//                new InMemoryKeyValueIterator(map.keySet(), false));
-                new EmptyKeyValueIterator<>());
+        throw new UnsupportedOperationException("ReverseAll not implemented.");
     }
 
     @Override
@@ -193,12 +176,11 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
     @Override
     public void flush() {
-        // do-nothing since it is in-memory
+        // no need
     }
 
     @Override
     public void close() {
-//        map.clear();
         mongoClient.close();
         size = 0;
         open = false;
