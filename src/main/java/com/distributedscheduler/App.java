@@ -1,5 +1,6 @@
 package com.distributedscheduler;
 
+import com.distributedscheduler.store.CustomerByteStoreSuplier;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
@@ -12,17 +13,12 @@ import org.apache.kafka.streams.kstream.Transformer;
 import org.apache.kafka.streams.kstream.TransformerSupplier;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.PunctuationType;
-import org.apache.kafka.streams.state.KeyValueIterator;
-import org.apache.kafka.streams.state.KeyValueStore;
-import org.apache.kafka.streams.state.StoreBuilder;
-import org.apache.kafka.streams.state.Stores;
+import org.apache.kafka.streams.processor.TaskId;
+import org.apache.kafka.streams.state.*;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.temporal.ChronoField;
-import java.util.Date;
 import java.util.Properties;
 import java.util.function.Function;
 
@@ -35,10 +31,13 @@ public class App {
 
     static final StoreBuilder<KeyValueStore<String, String>> distributedSchedulerStore = Stores
             .keyValueStoreBuilder(
-                    Stores.persistentKeyValueStore("distributed-scheduler-store"),
+//                    Stores.inMemoryKeyValueStore("distributed-scheduler-store"),
+                    new CustomerByteStoreSuplier("distributed-scheduler-store"),
                     Serdes.String(),
                     Serdes.String())
-            .withCachingEnabled();
+            .withCachingEnabled()
+            .withLoggingDisabled()
+            ;
 
     public static void main(final String[] args) {
 
@@ -53,8 +52,9 @@ public class App {
 
         streamsConfiguration.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         streamsConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
-        streamsConfiguration.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        streamsConfiguration.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/kafka-streams");
+        streamsConfiguration.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        streamsConfiguration.put(ConsumerConfig.GROUP_ID_CONFIG, "GROUPSID0");
+        streamsConfiguration.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/kafka-streams2");
 
         streamsConfiguration.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 10 * 1000);
 
@@ -73,10 +73,10 @@ public class App {
 
         final KStream<String, String> input = builder.stream(INPUT_TOPIC);
 
-        input.peek((k,v) -> System.out.println("Input value: "+v))
+        input.peek((k,v) -> System.out.println("Input value k: "+k+", v: "+v))
              .transform(new DistributedSchedulerTransformerSupplier(distributedSchedulerStore.name(), clock), distributedSchedulerStore.name())
              .filterNot((k,v) -> v==null)
-             .peek((k,v) -> System.out.println("Output value: "+v))
+             .peek((k,v) -> System.out.println("Output value k: "+k+", v: "+v))
              .to(OUTPUT_TOPIC);
 
         return builder.build();
@@ -110,6 +110,7 @@ public class App {
 
                 private KeyValueStore<String, String> stateStore;
                 private ProcessorContext context;
+                private TaskId taskId;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -117,10 +118,13 @@ public class App {
                     stateStore = (KeyValueStore<String, String>) context.getStateStore(stateStoreName);
 
                     this.context = context;
+                    this.taskId = context.taskId();
 
                     this.context.schedule(SCHEDULER_PERIOD, PunctuationType.WALL_CLOCK_TIME, timestamp -> {
+
                         long processingStartTimeMs = System.currentTimeMillis();
-                        System.out.println(".");
+                        System.out.println(". "+taskId);
+                        int count = 0;
                         try (KeyValueIterator<String, String> iterator = stateStore.all()) {
                             while (iterator.hasNext()) {
                                 KeyValue<String, String> keyValue = iterator.next();
@@ -131,9 +135,11 @@ public class App {
                                     context.forward(command.getPartitionKey(), command.getMessage());
                                     stateStore.delete(keyValue.key);
                                 }
+                                System.out.print(keyValue+", ");
+                                count++;
                             }
                         }
-
+                        System.out.println("Count: "+count);
                         long processDurationMs = System.currentTimeMillis() - processingStartTimeMs;
                         if (processDurationMs > SCHEDULER_PERIOD.toMillis()) System.out.println("Warning: Scheduler processing duration took "+processDurationMs+" ms, when SCHEDULER_PERIOD="+SCHEDULER_PERIOD.toMillis()+" ms.");
                     });
