@@ -23,6 +23,7 @@ import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NavigableMap;
@@ -102,7 +103,8 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
             databaseCollection.deleteOne(new Document("_id", key.toString()));
         } else {
 //            size += map.put(key, value) == null ? 1 : 0;
-            databaseCollection.insertOne(new Document("_id", key.toString()).append("value", value));
+            String stringValue = new String(value, StandardCharsets.UTF_8);
+            databaseCollection.insertOne(new Document("_id", key.toString()).append("value", stringValue));
         }
     }
 

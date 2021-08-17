@@ -16,10 +16,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.state.KeyValueStore;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.mockito.MockedStatic;
 
 import java.time.Clock;
@@ -36,6 +33,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 
 class AppTest {
+    static MongodExecutable mongodExecutable;
     Instant now = Instant.parse("2021-05-15T21:02:11.333824Z");
     Clock clock = Clock.fixed(now, ZoneId.of("UTC"));
 
@@ -46,7 +44,7 @@ class AppTest {
 
     @BeforeAll
     static void beforeAll() throws Exception {
-        setupEmbeddedMongo();
+        mongodExecutable = setupEmbeddedMongo("localhost", 37155, false);
     }
 
     @BeforeEach
@@ -68,6 +66,11 @@ class AppTest {
     @AfterEach
     void tearDown() {
         topologyTestDriver.close();
+    }
+
+    @AfterAll
+    static void afterAll() {
+        if (mongodExecutable != null) mongodExecutable.stop();
     }
 
     @Test
@@ -118,30 +121,24 @@ class AppTest {
                 "}";
     }
 
-    private static void setupEmbeddedMongo() throws Exception {
+    private static MongodExecutable setupEmbeddedMongo(String ip, int port, boolean isIpv6) throws Exception {
         MongodStarter starter = MongodStarter.getDefaultInstance();
 
-//        int port = Network.getFreeServerPort();
-        int port = 37155;
         MongodConfig mongodConfig = MongodConfig.builder()
                 .version(Version.Main.PRODUCTION)
-                .net(new Net(port, Network.localhostIsIPv6()))
+                .net(new Net(ip, port, false))
                 .build();
 
         MongodExecutable mongodExecutable = null;
         try {
             mongodExecutable = starter.prepare(mongodConfig);
-            MongodProcess mongod = mongodExecutable.start();
-
-//            try (MongoClient mongo = new MongoClient("localhost", port)) {
-//                DB db = mongo.getDB("test");
-//                DBCollection col = db.createCollection("testCol", new BasicDBObject());
-//                col.save(new BasicDBObject("testDoc", new Date()));
-//            }
-        } finally {
-//            if (mongodExecutable != null)
-//                mongodExecutable.stop();
+            mongodExecutable.start();
+        } catch (Exception e){
+            if (mongodExecutable != null) mongodExecutable.stop();
+            throw e;
         }
+
+        return mongodExecutable;
     }
 
 }
