@@ -4,6 +4,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.result.DeleteResult;
 import org.apache.kafka.common.serialization.Serializer;
@@ -24,13 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NavigableMap;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.Objects;
+import java.util.*;
 
 public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
@@ -77,6 +72,7 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
     }
 
 //    public void init(final StateStoreContext context, final StateStore root) {
+//        context.taskId()
 //    }
 
     @Override
@@ -93,7 +89,7 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
     public synchronized byte[] get(final Bytes key) {
 //        return map.get(key);
         Document document = databaseCollection.find(new Document("_id", key.toString())).first();
-        return document==null ? null : (byte[]) document.get("value");
+        return document==null ? null : String.valueOf(document.get("value")).getBytes();
     }
 
     @Override
@@ -144,7 +140,7 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 //        size -= oldValue == null ? 0 : 1;
         Document deletedDocument = databaseCollection.findOneAndDelete(new Document("_id", key.toString()));
         size -= deletedDocument == null ? 0 : 1;
-        return (byte[]) deletedDocument.get("key");
+        return String.valueOf(deletedDocument.get("_id")).getBytes();
     }
 
     @Override
@@ -158,26 +154,28 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
     }
 
     private KeyValueIterator<Bytes, byte[]> range(final Bytes from, final Bytes to, final boolean forward) {
-        if (from.compareTo(to) > 0) {
-            LOG.warn("Returning empty iterator for fetch with invalid key range: from > to. " +
-                    "This may be due to range arguments set in the wrong order, " +
-                    "or serdes that don't preserve ordering when lexicographically comparing the serialized bytes. " +
-                    "Note that the built-in numerical serdes do not follow this for negative numbers");
-            return new EmptyKeyValueIterator<>();
-        }
 
-        return new DelegatingPeekingKeyValueIterator<>(
-                name,
-//                new InMemoryKeyValueIterator(map.subMap(from, true, to, true).keySet(), forward));
-                new EmptyKeyValueIterator<>());
+        throw new UnsupportedOperationException("Range not ready yet");
+//
+//        if (from.compareTo(to) > 0) {
+//            LOG.warn("Returning empty iterator for fetch with invalid key range: from > to. " +
+//                    "This may be due to range arguments set in the wrong order, " +
+//                    "or serdes that don't preserve ordering when lexicographically comparing the serialized bytes. " +
+//                    "Note that the built-in numerical serdes do not follow this for negative numbers");
+//            return new EmptyKeyValueIterator<>();
+//        }
+//
+//        return new DelegatingPeekingKeyValueIterator<>(
+//                name,
+////                new InMemoryKeyValueIterator(map.subMap(from, true, to, true).keySet(), forward));
+//                new EmptyKeyValueIterator<>());
     }
 
     @Override
     public synchronized KeyValueIterator<Bytes, byte[]> all() {
-        return new DelegatingPeekingKeyValueIterator<>(
-                name,
-//                new InMemoryKeyValueIterator(map.keySet(), true));
-                new EmptyKeyValueIterator<>());
+        MongoCursor<Document> mongoCursor = databaseCollection.find().batchSize(1000).iterator();
+
+        return new DelegatingPeekingKeyValueIterator<>(name, new MongoCursorKeyValueIterator(mongoCursor));
     }
 
     @Override
@@ -205,37 +203,4 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
         size = 0;
         open = false;
     }
-//
-//    private class InMemoryKeyValueIterator implements KeyValueIterator<Bytes, byte[]> {
-//        private final Iterator<Bytes> iter;
-//
-//        private InMemoryKeyValueIterator(final Set<Bytes> keySet, final boolean forward) {
-//            if (forward) {
-//                this.iter = new TreeSet<>(keySet).iterator();
-//            } else {
-//                this.iter = new TreeSet<>(keySet).descendingIterator();
-//            }
-//        }
-//
-//        @Override
-//        public boolean hasNext() {
-//            return iter.hasNext();
-//        }
-//
-//        @Override
-//        public KeyValue<Bytes, byte[]> next() {
-//            final Bytes key = iter.next();
-//            return new KeyValue<>(key, map.get(key));
-//        }
-//
-//        @Override
-//        public void close() {
-//            // do nothing
-//        }
-//
-//        @Override
-//        public Bytes peekNextKey() {
-//            throw new UnsupportedOperationException("peekNextKey() not supported in " + getClass().getName());
-//        }
-//    }
 }

@@ -35,7 +35,7 @@ public class App {
                     new CustomerByteStoreSuplier("distributed-scheduler-store"),
                     Serdes.String(),
                     Serdes.String())
-            .withCachingEnabled()
+            .withCachingDisabled()
             .withLoggingDisabled()
             ;
 
@@ -143,6 +143,8 @@ public class App {
                         long processDurationMs = System.currentTimeMillis() - processingStartTimeMs;
                         if (processDurationMs > SCHEDULER_PERIOD.toMillis()) System.out.println("Warning: Scheduler processing duration took "+processDurationMs+" ms, when SCHEDULER_PERIOD="+SCHEDULER_PERIOD.toMillis()+" ms.");
                     });
+
+                    this.stateStore.flush();
                 }
 
                 @Override
@@ -153,6 +155,8 @@ public class App {
 
                 @Override
                 public void close() {
+                    stateStore.flush();
+                    context.commit();
                     // Note: The store should NOT be closed manually here via `stateStore.close()`!
                     // The Kafka Streams API will automatically close stores when necessary.
                 }
