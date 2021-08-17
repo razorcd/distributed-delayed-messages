@@ -1,13 +1,25 @@
 package com.distributedscheduler.store;
 
+import com.mongodb.BasicDBObject;
+import com.mongodb.DBObject;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.result.DeleteResult;
 import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
+import org.apache.kafka.streams.processor.StateStoreContext;
+import org.apache.kafka.streams.processor.TaskId;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.internals.DelegatingPeekingKeyValueIterator;
+import org.bson.BsonDocument;
+import org.bson.BsonValue;
+import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,12 +36,19 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
     private static final Logger LOG = LoggerFactory.getLogger(com.distributedscheduler.store.CustomKeyValueStore.class);
 
     private final String name;
-    private final NavigableMap<Bytes, byte[]> map = new TreeMap<>();
+    private final MongoClient mongoClient;
+    private final MongoDatabase database;
+    private MongoCollection<Document> databaseCollection;
+
+
+//    private final NavigableMap<Bytes, byte[]> map = new TreeMap<>();
     private volatile boolean open = false;
     private long size = 0L; // SkipListMap#size is O(N) so we just do our best to track it
 
-    public CustomKeyValueStore(final String name) {
+    public CustomKeyValueStore(final String name, final MongoClient mongoClient) {
         this.name = name;
+        this.mongoClient = mongoClient;
+        this.database = mongoClient.getDatabase(name);
     }
 
     @Override
@@ -41,6 +60,12 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
     @Override
     public void init(final ProcessorContext context,
                      final StateStore root) {
+        TaskId taskId = context.taskId();
+        String collectionName = String.valueOf(taskId.partition);
+        database.createCollection(collectionName);
+        databaseCollection = database.getCollection(collectionName);
+
+
         size = 0;
         if (root != null) {
             // register the store
@@ -49,6 +74,9 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
         open = true;
     }
+
+//    public void init(final StateStoreContext context, final StateStore root) {
+//    }
 
     @Override
     public boolean persistent() {
@@ -62,15 +90,19 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
     @Override
     public synchronized byte[] get(final Bytes key) {
-        return map.get(key);
+//        return map.get(key);
+        Document document = databaseCollection.find(new Document("_id", key.toString())).first();
+        return document==null ? null : (byte[]) document.get("value");
     }
 
     @Override
     public synchronized void put(final Bytes key, final byte[] value) {
         if (value == null) {
-            size -= map.remove(key) == null ? 0 : 1;
+//            size -= map.remove(key) == null ? 0 : 1;
+            databaseCollection.deleteOne(new Document("_id", key.toString()));
         } else {
-            size += map.put(key, value) == null ? 1 : 0;
+//            size += map.put(key, value) == null ? 1 : 0;
+            databaseCollection.insertOne(new Document("_id", key.toString()).append("value", value));
         }
     }
 
@@ -89,26 +121,28 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
             put(entry.key, entry.value);
         }
     }
-
-    @Override
-    public <PS extends Serializer<P>, P> KeyValueIterator<Bytes, byte[]> prefixScan(final P prefix, final PS prefixKeySerializer) {
-        Objects.requireNonNull(prefix, "prefix cannot be null");
-        Objects.requireNonNull(prefixKeySerializer, "prefixKeySerializer cannot be null");
-
-        final Bytes from = Bytes.wrap(prefixKeySerializer.serialize(null, prefix));
-        final Bytes to = Bytes.increment(from);
-
-        return new DelegatingPeekingKeyValueIterator<>(
-                name,
-                new InMemoryKeyValueIterator(map.subMap(from, true, to, false).keySet(), true)
-        );
-    }
+//
+//    @Override
+//    public <PS extends Serializer<P>, P> KeyValueIterator<Bytes, byte[]> prefixScan(final P prefix, final PS prefixKeySerializer) {
+//        Objects.requireNonNull(prefix, "prefix cannot be null");
+//        Objects.requireNonNull(prefixKeySerializer, "prefixKeySerializer cannot be null");
+//
+//        final Bytes from = Bytes.wrap(prefixKeySerializer.serialize(null, prefix));
+//        final Bytes to = Bytes.increment(from);
+//
+//        return new DelegatingPeekingKeyValueIterator<>(
+//                name,
+//                new InMemoryKeyValueIterator(map.subMap(from, true, to, false).keySet(), true)
+//        );
+//    }
 
     @Override
     public synchronized byte[] delete(final Bytes key) {
-        final byte[] oldValue = map.remove(key);
-        size -= oldValue == null ? 0 : 1;
-        return oldValue;
+//        final byte[] oldValue = map.remove(key);
+//        size -= oldValue == null ? 0 : 1;
+        Document deletedDocument = databaseCollection.findOneAndDelete(new Document("_id", key.toString()));
+        size -= deletedDocument == null ? 0 : 1;
+        return (byte[]) deletedDocument.get("key");
     }
 
     @Override
@@ -132,21 +166,24 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
         return new DelegatingPeekingKeyValueIterator<>(
                 name,
-                new InMemoryKeyValueIterator(map.subMap(from, true, to, true).keySet(), forward));
+//                new InMemoryKeyValueIterator(map.subMap(from, true, to, true).keySet(), forward));
+                new EmptyKeyValueIterator<>());
     }
 
     @Override
     public synchronized KeyValueIterator<Bytes, byte[]> all() {
         return new DelegatingPeekingKeyValueIterator<>(
                 name,
-                new InMemoryKeyValueIterator(map.keySet(), true));
+//                new InMemoryKeyValueIterator(map.keySet(), true));
+                new EmptyKeyValueIterator<>());
     }
 
     @Override
     public synchronized KeyValueIterator<Bytes, byte[]> reverseAll() {
         return new DelegatingPeekingKeyValueIterator<>(
                 name,
-                new InMemoryKeyValueIterator(map.keySet(), false));
+//                new InMemoryKeyValueIterator(map.keySet(), false));
+                new EmptyKeyValueIterator<>());
     }
 
     @Override
@@ -161,41 +198,42 @@ public class CustomKeyValueStore implements KeyValueStore<Bytes, byte[]> {
 
     @Override
     public void close() {
-        map.clear();
+//        map.clear();
+        mongoClient.close();
         size = 0;
         open = false;
     }
-
-    private class InMemoryKeyValueIterator implements KeyValueIterator<Bytes, byte[]> {
-        private final Iterator<Bytes> iter;
-
-        private InMemoryKeyValueIterator(final Set<Bytes> keySet, final boolean forward) {
-            if (forward) {
-                this.iter = new TreeSet<>(keySet).iterator();
-            } else {
-                this.iter = new TreeSet<>(keySet).descendingIterator();
-            }
-        }
-
-        @Override
-        public boolean hasNext() {
-            return iter.hasNext();
-        }
-
-        @Override
-        public KeyValue<Bytes, byte[]> next() {
-            final Bytes key = iter.next();
-            return new KeyValue<>(key, map.get(key));
-        }
-
-        @Override
-        public void close() {
-            // do nothing
-        }
-
-        @Override
-        public Bytes peekNextKey() {
-            throw new UnsupportedOperationException("peekNextKey() not supported in " + getClass().getName());
-        }
-    }
+//
+//    private class InMemoryKeyValueIterator implements KeyValueIterator<Bytes, byte[]> {
+//        private final Iterator<Bytes> iter;
+//
+//        private InMemoryKeyValueIterator(final Set<Bytes> keySet, final boolean forward) {
+//            if (forward) {
+//                this.iter = new TreeSet<>(keySet).iterator();
+//            } else {
+//                this.iter = new TreeSet<>(keySet).descendingIterator();
+//            }
+//        }
+//
+//        @Override
+//        public boolean hasNext() {
+//            return iter.hasNext();
+//        }
+//
+//        @Override
+//        public KeyValue<Bytes, byte[]> next() {
+//            final Bytes key = iter.next();
+//            return new KeyValue<>(key, map.get(key));
+//        }
+//
+//        @Override
+//        public void close() {
+//            // do nothing
+//        }
+//
+//        @Override
+//        public Bytes peekNextKey() {
+//            throw new UnsupportedOperationException("peekNextKey() not supported in " + getClass().getName());
+//        }
+//    }
 }

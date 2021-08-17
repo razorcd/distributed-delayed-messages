@@ -1,11 +1,23 @@
 package com.distributedscheduler;
 
+import com.mongodb.BasicDBObject;
+import com.mongodb.DB;
+import com.mongodb.DBCollection;
+import com.mongodb.client.MongoClient;
+import de.flapdoodle.embed.mongo.MongodExecutable;
+import de.flapdoodle.embed.mongo.MongodProcess;
+import de.flapdoodle.embed.mongo.MongodStarter;
+import de.flapdoodle.embed.mongo.config.MongodConfig;
+import de.flapdoodle.embed.mongo.config.Net;
+import de.flapdoodle.embed.mongo.distribution.Version;
+import de.flapdoodle.embed.process.runtime.Network;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -15,6 +27,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoField;
+import java.util.Date;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,6 +43,11 @@ class AppTest {
     TestOutputTopic<String, String> output;
     TopologyTestDriver topologyTestDriver;
     KeyValueStore<String, String> store;
+
+    @BeforeAll
+    static void beforeAll() throws Exception {
+        setupEmbeddedMongo();
+    }
 
     @BeforeEach
     void setUp() {
@@ -98,6 +116,32 @@ class AppTest {
                     "\"message\": \""+message+"\"," +
                     "\"partitionKey\": \""+partitionKey+"\"" +
                 "}";
+    }
+
+    private static void setupEmbeddedMongo() throws Exception {
+        MongodStarter starter = MongodStarter.getDefaultInstance();
+
+//        int port = Network.getFreeServerPort();
+        int port = 37155;
+        MongodConfig mongodConfig = MongodConfig.builder()
+                .version(Version.Main.PRODUCTION)
+                .net(new Net(port, Network.localhostIsIPv6()))
+                .build();
+
+        MongodExecutable mongodExecutable = null;
+        try {
+            mongodExecutable = starter.prepare(mongodConfig);
+            MongodProcess mongod = mongodExecutable.start();
+
+//            try (MongoClient mongo = new MongoClient("localhost", port)) {
+//                DB db = mongo.getDB("test");
+//                DBCollection col = db.createCollection("testCol", new BasicDBObject());
+//                col.save(new BasicDBObject("testDoc", new Date()));
+//            }
+        } finally {
+//            if (mongodExecutable != null)
+//                mongodExecutable.stop();
+        }
     }
 
 }
