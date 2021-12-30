@@ -19,7 +19,6 @@ public class AppConfig {
                 .registerModule(JsonFormat.getCloudEventJacksonModule(false, true))
                 ;
         mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
-        mapper.addMixIn(CloudEvent.class, CloudEventMixin.class);
         return mapper;
     };
 
