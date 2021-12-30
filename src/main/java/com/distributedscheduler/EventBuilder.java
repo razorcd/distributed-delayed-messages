@@ -16,29 +16,54 @@ import java.time.ZoneOffset;
 @RequiredArgsConstructor
 public class EventBuilder {
 
-    private final ObjectMapper objectMapper;
+//    private final ObjectMapper objectMapper;
     private final Clock clock;
 
 
-    public CloudEvent buildEvent(String rawInputEvent) {
+    public CloudEventV1 buildEvent(String serializedStringData) {
         DistributedSchedulerMetaData metaData = new DistributedSchedulerMetaData(clock.instant(), 1, "topic1");
-        DistributedSchedulerData data = new DistributedSchedulerData(rawInputEvent, metaData);
+        DistributedSchedulerData data = new DistributedSchedulerData(serializedStringData, metaData);
 
-        return CloudEventBuilder.v1()
-                .withId("id1")
-                .withSource(URI.create("/source"))
-                .withDataContentType("application/json")
-                .withType("DistributedSchedulerEvent")
-                .withTime(clock.instant().atOffset(ZoneOffset.UTC))
-                .withData(PojoCloudEventData.wrap(data, objectMapper::writeValueAsBytes))
-                .build();
+        return new CloudEventV1(
+                "id1",
+                URI.create("/source"),
+                "DistributedSchedulerEvent",
+                "application/json",
+                null,
+                clock.instant(),
+                data
+        );
+
+//        return CloudEventBuilder.v1()
+//                .withId("id1")
+//                .withSource(URI.create("/source"))
+//                .withDataContentType("application/json")
+//                .withType("DistributedSchedulerEvent")
+//                .withTime(clock.instant().atOffset(ZoneOffset.UTC))
+//                .withData(PojoCloudEventData.wrap(data, objectMapper::writeValueAsBytes))
+//                .build();
     }
+
+    @Value
+    @RequiredArgsConstructor
+    @NoArgsConstructor(force = true)
+    public static class CloudEventV1 {
+        String specversion = "1.0";
+        String id;
+        URI source;
+        String type;
+        String datacontenttype;
+        URI dataschema;
+        Instant time;
+        DistributedSchedulerData data;
+    }
+
 
     @Value
     @NoArgsConstructor(force = true)
     @RequiredArgsConstructor
     public static class DistributedSchedulerData {
-        String rawEvent;
+        String serializedJsonData;
         DistributedSchedulerMetaData metaData;
     }
 
