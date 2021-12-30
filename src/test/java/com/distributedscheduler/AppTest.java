@@ -1,16 +1,10 @@
 package com.distributedscheduler;
 
-import com.mongodb.BasicDBObject;
-import com.mongodb.DB;
-import com.mongodb.DBCollection;
-import com.mongodb.client.MongoClient;
 import de.flapdoodle.embed.mongo.MongodExecutable;
-import de.flapdoodle.embed.mongo.MongodProcess;
 import de.flapdoodle.embed.mongo.MongodStarter;
 import de.flapdoodle.embed.mongo.config.MongodConfig;
 import de.flapdoodle.embed.mongo.config.Net;
 import de.flapdoodle.embed.mongo.distribution.Version;
-import de.flapdoodle.embed.process.runtime.Network;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -24,7 +18,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoField;
-import java.util.Date;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,7 +26,6 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 
 class AppTest {
-    static MongodExecutable mongodExecutable;
     Instant now = Instant.parse("2021-05-15T21:02:11.333824Z");
     Clock clock = Clock.fixed(now, ZoneId.of("UTC"));
 
@@ -44,7 +36,6 @@ class AppTest {
 
     @BeforeAll
     static void beforeAll() throws Exception {
-        mongodExecutable = setupEmbeddedMongo("localhost", 37155, false);
     }
 
     @BeforeEach
@@ -70,7 +61,6 @@ class AppTest {
 
     @AfterAll
     static void afterAll() {
-        if (mongodExecutable != null) mongodExecutable.stop();
     }
 
     @Test
@@ -120,25 +110,4 @@ class AppTest {
                     "\"partitionKey\": \""+partitionKey+"\"" +
                 "}";
     }
-
-    private static MongodExecutable setupEmbeddedMongo(String ip, int port, boolean isIpv6) throws Exception {
-        MongodStarter starter = MongodStarter.getDefaultInstance();
-
-        MongodConfig mongodConfig = MongodConfig.builder()
-                .version(Version.Main.PRODUCTION)
-                .net(new Net(ip, port, false))
-                .build();
-
-        MongodExecutable mongodExecutable = null;
-        try {
-            mongodExecutable = starter.prepare(mongodConfig);
-            mongodExecutable.start();
-        } catch (Exception e){
-            if (mongodExecutable != null) mongodExecutable.stop();
-            throw e;
-        }
-
-        return mongodExecutable;
-    }
-
 }

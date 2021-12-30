@@ -1,6 +1,5 @@
 package com.distributedscheduler;
 
-import com.distributedscheduler.store.CustomerByteStoreSuplier;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
@@ -14,7 +13,10 @@ import org.apache.kafka.streams.kstream.TransformerSupplier;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.TaskId;
-import org.apache.kafka.streams.state.*;
+import org.apache.kafka.streams.state.KeyValueIterator;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.StoreBuilder;
+import org.apache.kafka.streams.state.Stores;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -31,12 +33,11 @@ public class App {
 
     static final StoreBuilder<KeyValueStore<String, String>> distributedSchedulerStore = Stores
             .keyValueStoreBuilder(
-//                    Stores.inMemoryKeyValueStore("distributed-scheduler-store"),
-                    new CustomerByteStoreSuplier("distributed-scheduler-store"),
+                    Stores.inMemoryKeyValueStore("distributed-scheduler-store"),
                     Serdes.String(),
                     Serdes.String())
             .withCachingDisabled()
-            .withLoggingDisabled()
+//            .withLoggingDisabled()
             ;
 
     public static void main(final String[] args) {
