@@ -1,13 +1,16 @@
 package com.distributedscheduler;
 
+import de.flapdoodle.embed.mongo.MongodExecutable;
+import de.flapdoodle.embed.mongo.MongodStarter;
+import de.flapdoodle.embed.mongo.config.MongodConfig;
+import de.flapdoodle.embed.mongo.config.Net;
+import de.flapdoodle.embed.mongo.distribution.Version;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.state.KeyValueStore;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.mockito.MockedStatic;
 
 import java.time.Clock;
@@ -31,6 +34,10 @@ class AppTest {
     TopologyTestDriver topologyTestDriver;
     KeyValueStore<String, String> store;
 
+    @BeforeAll
+    static void beforeAll() throws Exception {
+    }
+
     @BeforeEach
     void setUp() {
         final Properties streamsConfiguration = new Properties();
@@ -50,6 +57,10 @@ class AppTest {
     @AfterEach
     void tearDown() {
         topologyTestDriver.close();
+    }
+
+    @AfterAll
+    static void afterAll() {
     }
 
     @Test
@@ -99,5 +110,4 @@ class AppTest {
                     "\"partitionKey\": \""+partitionKey+"\"" +
                 "}";
     }
-
 }
