@@ -26,7 +26,7 @@ import java.util.function.Function;
 
 public class App {
     static final Clock CLOCK = Clock.systemUTC();
-    static final ObjectMapper objectMapper = new ObjectMapper().registerModule(new Jdk8Module()).registerModule(new JavaTimeModule());
+    static final ObjectMapper objectMapper = AppConfig.objectMapper;
 
     static final String INPUT_TOPIC = "distributed-scheduler-input";
     static final String OUTPUT_TOPIC = "distributed-scheduler-output";

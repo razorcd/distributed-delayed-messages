@@ -44,4 +44,17 @@ input -> distributed-scheduler --> output
  - output k/v serializer?
  
  
-  
+### Event:
+
+```json
+{
+  "id":"5010e38c-ff1e-4274-9aaa-b27efd7e5c49",
+  "source":"/myApp",
+  "specversion":"1.0",
+  "type":"eventTypeHere",
+  "time":"2020-12-28T21:57:31.744",
+  "dataschema":null,
+  "datacontenttype":"application/json",
+  "data": "{\"restaurantId\":\"1001\",\"notification\":\"Picking up order at 22:05\"}"
+}
+```  
