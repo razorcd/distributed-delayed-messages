@@ -5,15 +5,16 @@ Distributed Scheduler Application to handle event publishing by delaying, repeat
 Branch to use Mongo as Custom State store: https://github.com/razorcd/distributed-scheduler/tree/CustomStateStore
 
 ```
-input -> distributed-scheduler --> output
+input -> distributed-scheduler -.--> output1
+                                `--> output2
 ```
 
 ###TODO:
- - [ ] move shouldPublish(now) method inside event
- - [ ] add cloud events
+ - [x] add cloud events
  - [ ] add load tests
- - [ ] add multiple topics
+ - [x] add multiple topics
  - [ ] integrate different stores
+ - [ ] implement all Ideas
  
 ###Ideas for events behavior:
 
