@@ -18,6 +18,8 @@ import org.apache.kafka.streams.state.Stores;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 public class App {
@@ -25,7 +27,7 @@ public class App {
     static final Serde serde = new Serde(AppConfig.objectMapper.get());
 
     static final String INPUT_TOPIC = "distributed-scheduler-input";
-    static final String OUTPUT_TOPIC = "distributed-scheduler-output";
+    static final List<String> OUTPUT_TOPICS = Arrays.asList("distributed-scheduler-output1", "distributed-scheduler-output2");
 
     static final StoreBuilder<KeyValueStore<String, String>> distributedSchedulerStore = Stores
             .keyValueStoreBuilder(
@@ -70,17 +72,24 @@ public class App {
 
         final KStream<String, String> input = builder.stream(INPUT_TOPIC);
 
-        input.peek((k,v) -> System.out.println("Input value k: "+k+", v: "+v))
-             .transform(new DistributedSchedulerTransformerSupplier(distributedSchedulerStore.name(), clock), distributedSchedulerStore.name())
-             .filterNot((k,v) -> v==null)
-             .peek((k,v) -> System.out.println("Output value k: "+k+", v: "+v))
-             .to(OUTPUT_TOPIC);
+        KStream<String, Data> output = input.peek((k, v) -> System.out.println("Input value k: " + k + ", v: " + v))
+                .transform(new DistributedSchedulerTransformerSupplier(distributedSchedulerStore.name(), clock), distributedSchedulerStore.name())
+                .filterNot((k, v) -> v == null)
+                .peek((k, v) -> System.out.println("Output value k: " + k + ", v: " + v));
+
+        OUTPUT_TOPICS.forEach(topic ->
+                output.filter((k,v) ->
+                        topic
+                        .equals(v.getMetaData().getOutputTopic()))
+                        .mapValues((k,v) -> v.getSerializedJsonData())
+                        .to(topic)
+        );
 
         return builder.build();
     }
 
 
-    private static final class DistributedSchedulerTransformerSupplier implements TransformerSupplier<String, String, KeyValue<String, String>> {
+    private static final class DistributedSchedulerTransformerSupplier implements TransformerSupplier<String, String, KeyValue<String, Data>> {
 
         private static final Duration SCHEDULER_PERIOD = Duration.ofSeconds(10);
 
@@ -93,8 +102,8 @@ public class App {
         }
 
         @Override
-        public Transformer<String, String, KeyValue<String, String>> get() {
-            return new Transformer<String, String, KeyValue<String, String>>() {
+        public Transformer<String, String, KeyValue<String, Data>> get() {
+            return new Transformer<String, String, KeyValue<String, Data>>() {
 
                 private KeyValueStore<String, String> stateStore;
                 private ProcessorContext context;
@@ -121,7 +130,7 @@ public class App {
 
                                 Instant now = Instant.now(clock);
                                 if (metaData.getStartAt().isBefore(now) || metaData.getStartAt().equals(now)) {
-                                    context.forward(keyValue.key, data.getSerializedJsonData());
+                                    context.forward(keyValue.key, data);
                                     stateStore.delete(keyValue.key);
                                 }
 //                                System.out.print(keyValue+", ");
@@ -136,8 +145,9 @@ public class App {
                     this.stateStore.flush();
                 }
 
+
                 @Override
-                public KeyValue<String, String> transform(final String key, final String value) {
+                public KeyValue<String, Data> transform(final String key, final String value) {
                     stateStore.put(key, value);
                     return KeyValue.pair(null,null);
                 }

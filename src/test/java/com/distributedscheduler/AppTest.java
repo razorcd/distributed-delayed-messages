@@ -13,7 +13,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoField;
+import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -25,7 +27,7 @@ class AppTest {
     Clock clock = Clock.fixed(now, ZoneId.of("UTC"));
 
     TestInputTopic<String, String> input;
-    TestOutputTopic<String, String> output;
+    List<TestOutputTopic<String, String>> outputTopics;
     TopologyTestDriver topologyTestDriver;
     KeyValueStore<String, String> store;
 
@@ -44,7 +46,8 @@ class AppTest {
 
         this.topologyTestDriver = new TopologyTestDriver(App.getTopology(clock), streamsConfiguration);
         input = topologyTestDriver.createInputTopic(App.INPUT_TOPIC, new StringSerializer(), new StringSerializer(), Instant.EPOCH, Duration.ofMillis(1));
-        output = topologyTestDriver.createOutputTopic(App.OUTPUT_TOPIC, new StringDeserializer(), new StringDeserializer());
+        outputTopics = App.OUTPUT_TOPICS.stream().map(topic -> topologyTestDriver.createOutputTopic(topic, new StringDeserializer(), new StringDeserializer())).collect(Collectors.toList());
+
 
         store = topologyTestDriver.getKeyValueStore("distributed-scheduler-store");
     }
@@ -59,14 +62,16 @@ class AppTest {
     }
 
     @Test
-    void givenEmptyStore_whenReceivingDelayedCommand_shouldEmitMessageByPublishTime() throws InterruptedException {
+    void givenEmptyStore_whenReceivingEventsWithPublishOnceAtStartTime_shouldEmitMessageOnceAtStartTime() throws InterruptedException {
         Instant nowPlus20SecInstant = now.plusSeconds(20);
         Instant nowPlus30SecInstant = now.plusSeconds(30);
         long nowPlus20Sec = nowPlus20SecInstant.getEpochSecond();
 
         //when
-        String event = createDelayedEvent(nowPlus20SecInstant, "message1", 1, App.OUTPUT_TOPIC);
-        input.pipeInput("111", event);
+        String event0 = createDelayedEvent(nowPlus20SecInstant, "message0", 1, App.OUTPUT_TOPICS.get(1));
+        String event1 = createDelayedEvent(nowPlus20SecInstant, "message1", 1, App.OUTPUT_TOPICS.get(1));
+        input.pipeInput("111", event0);
+        input.pipeInput("111", event1);
 
         //then don't publish yet
         MockedStatic instantMock = mockStatic(Instant.class);
@@ -74,7 +79,7 @@ class AppTest {
 
         instantMock.when(() -> Instant.now(clock)).thenReturn(now);
         topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
-        assertTrue(output.isEmpty());
+        assertTrue(outputTopics.stream().allMatch(TestOutputTopic::isEmpty));
         assertNotNull(store.get("111"));
 
         //and when
@@ -82,7 +87,8 @@ class AppTest {
         topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
 
         //then publish it
-        assertEquals(KeyValue.pair("111", "message1"), output.readKeyValue());
+        assertTrue(outputTopics.get(0).isEmpty());
+        assertEquals(KeyValue.pair("111", "message1"), outputTopics.get(1).readKeyValue());
         assertNull(store.get("111"));
 
         //and when
@@ -90,7 +96,7 @@ class AppTest {
         topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
 
         //then publish nothing else
-        assertTrue(output.isEmpty());
+        assertTrue(outputTopics.stream().allMatch(TestOutputTopic::isEmpty));
         assertNull(store.get("111"));
 
         //finally
