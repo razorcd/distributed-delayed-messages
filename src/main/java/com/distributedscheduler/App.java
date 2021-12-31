@@ -1,9 +1,6 @@
 package com.distributedscheduler;
 
-import com.distributedscheduler.event.CloudEventV1;
 import com.distributedscheduler.event.Data;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
@@ -22,11 +19,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Properties;
-import java.util.function.Function;
 
 public class App {
-    static final Clock CLOCK = Clock.systemUTC();
-    static final ObjectMapper objectMapper = AppConfig.objectMapper.get();
+    static final Clock CLOCK = AppConfig.clock;
+    static final Serde serde = new Serde(AppConfig.objectMapper.get());
 
     static final String INPUT_TOPIC = "distributed-scheduler-input";
     static final String OUTPUT_TOPIC = "distributed-scheduler-output";
@@ -98,15 +94,6 @@ public class App {
 
         @Override
         public Transformer<String, String, KeyValue<String, String>> get() {
-            Function<String, CloudEventV1> deserialize = (json) -> {
-                try {
-                    return objectMapper.readValue(json, CloudEventV1.class);
-                } catch (JsonProcessingException e) {
-                    throw new RuntimeException("Error deserialising json: "+json);
-                }
-            };
-
-
             return new Transformer<String, String, KeyValue<String, String>>() {
 
                 private KeyValueStore<String, String> stateStore;
@@ -129,7 +116,7 @@ public class App {
                         try (KeyValueIterator<String, String> iterator = stateStore.all()) {
                             while (iterator.hasNext()) {
                                 KeyValue<String, String> keyValue = iterator.next();
-                                Data data = deserialize.apply(keyValue.value).getData();
+                                Data data = serde.deserialize(keyValue.value).getData();
                                 Data.MetaData metaData = data.getMetaData();
 
                                 Instant now = Instant.now(clock);
