@@ -1,12 +1,11 @@
 package com.distributedscheduler;
 
-import lombok.NoArgsConstructor;
+import com.distributedscheduler.event.CloudEventV1;
+import com.distributedscheduler.event.Data;
 import lombok.RequiredArgsConstructor;
-import lombok.Value;
 
 import java.net.URI;
 import java.time.Clock;
-import java.time.Instant;
 
 @RequiredArgsConstructor
 public class EventBuilder {
@@ -14,9 +13,9 @@ public class EventBuilder {
     private final Clock clock;
 
 
-    public CloudEventV1 buildEvent(String serializedStringData, DistributedSchedulerMetaData metaData) {
+    public CloudEventV1 buildEvent(String serializedStringData, Data.MetaData metaData) {
 //        DistributedSchedulerMetaData metaData = new DistributedSchedulerMetaData(clock.instant(), 1, "topic1");
-        DistributedSchedulerData data = new DistributedSchedulerData(serializedStringData, metaData);
+        Data data = new Data(serializedStringData, metaData);
 
         return new CloudEventV1(
                 "id1",
@@ -29,35 +28,4 @@ public class EventBuilder {
         );
     }
 
-    @Value
-    @RequiredArgsConstructor
-    @NoArgsConstructor(force = true)
-    public static class CloudEventV1 {
-        String specversion = "1.0";
-        String id;
-        URI source;
-        String type;
-        String datacontenttype;
-        URI dataschema;
-        Instant time;
-        DistributedSchedulerData data;
-    }
-
-
-    @Value
-    @NoArgsConstructor(force = true)
-    @RequiredArgsConstructor
-    public static class DistributedSchedulerData {
-        String serializedJsonData;
-        DistributedSchedulerMetaData metaData;
-    }
-
-    @Value
-    @NoArgsConstructor(force = true)
-    @RequiredArgsConstructor
-    public static class DistributedSchedulerMetaData {
-        Instant startAt;
-        Integer times;
-        String outputTopic;
-    }
 }

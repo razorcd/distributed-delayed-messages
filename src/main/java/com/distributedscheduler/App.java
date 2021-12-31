@@ -1,9 +1,9 @@
 package com.distributedscheduler;
 
+import com.distributedscheduler.event.CloudEventV1;
+import com.distributedscheduler.event.Data;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
@@ -98,9 +98,9 @@ public class App {
 
         @Override
         public Transformer<String, String, KeyValue<String, String>> get() {
-            Function<String, EventBuilder.CloudEventV1> deserialize = (json) -> {
+            Function<String, CloudEventV1> deserialize = (json) -> {
                 try {
-                    return objectMapper.readValue(json, EventBuilder.CloudEventV1.class);
+                    return objectMapper.readValue(json, CloudEventV1.class);
                 } catch (JsonProcessingException e) {
                     throw new RuntimeException("Error deserialising json: "+json);
                 }
@@ -129,8 +129,8 @@ public class App {
                         try (KeyValueIterator<String, String> iterator = stateStore.all()) {
                             while (iterator.hasNext()) {
                                 KeyValue<String, String> keyValue = iterator.next();
-                                EventBuilder.DistributedSchedulerData data = deserialize.apply(keyValue.value).getData();
-                                EventBuilder.DistributedSchedulerMetaData metaData = data.getMetaData();
+                                Data data = deserialize.apply(keyValue.value).getData();
+                                Data.MetaData metaData = data.getMetaData();
 
                                 Instant now = Instant.now(clock);
                                 if (metaData.getStartAt().isBefore(now) || metaData.getStartAt().equals(now)) {
