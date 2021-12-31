@@ -98,9 +98,9 @@ public class App {
 
         @Override
         public Transformer<String, String, KeyValue<String, String>> get() {
-            Function<String, DelayedCommand> deserialize = (json) -> {
+            Function<String, EventBuilder.CloudEventV1> deserialize = (json) -> {
                 try {
-                    return objectMapper.readValue(json, DelayedCommand.class);
+                    return objectMapper.readValue(json, EventBuilder.CloudEventV1.class);
                 } catch (JsonProcessingException e) {
                     throw new RuntimeException("Error deserialising json: "+json);
                 }
@@ -129,14 +129,15 @@ public class App {
                         try (KeyValueIterator<String, String> iterator = stateStore.all()) {
                             while (iterator.hasNext()) {
                                 KeyValue<String, String> keyValue = iterator.next();
-                                DelayedCommand command = deserialize.apply(keyValue.value);
+                                EventBuilder.DistributedSchedulerData data = deserialize.apply(keyValue.value).getData();
+                                EventBuilder.DistributedSchedulerMetaData metaData = data.getMetaData();
 
                                 Instant now = Instant.now(clock);
-                                if (command.getPublishAt().isBefore(now) || command.getPublishAt().equals(now)) {
-                                    context.forward(command.getPartitionKey(), command.getMessage());
+                                if (metaData.getStartAt().isBefore(now) || metaData.getStartAt().equals(now)) {
+                                    context.forward(keyValue.key, data.getSerializedJsonData());
                                     stateStore.delete(keyValue.key);
                                 }
-                                System.out.print(keyValue+", ");
+//                                System.out.print(keyValue+", ");
                                 count++;
                             }
                         }

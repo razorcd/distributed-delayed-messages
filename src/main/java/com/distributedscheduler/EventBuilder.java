@@ -14,8 +14,8 @@ public class EventBuilder {
     private final Clock clock;
 
 
-    public CloudEventV1 buildEvent(String serializedStringData) {
-        DistributedSchedulerMetaData metaData = new DistributedSchedulerMetaData(clock.instant(), 1, "topic1");
+    public CloudEventV1 buildEvent(String serializedStringData, DistributedSchedulerMetaData metaData) {
+//        DistributedSchedulerMetaData metaData = new DistributedSchedulerMetaData(clock.instant(), 1, "topic1");
         DistributedSchedulerData data = new DistributedSchedulerData(serializedStringData, metaData);
 
         return new CloudEventV1(
@@ -58,6 +58,6 @@ public class EventBuilder {
     public static class DistributedSchedulerMetaData {
         Instant startAt;
         Integer times;
-        String topic;
+        String outputTopic;
     }
 }

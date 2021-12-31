@@ -65,7 +65,7 @@ class AppTest {
         long nowPlus20Sec = nowPlus20SecInstant.getEpochSecond();
 
         //when
-        String event = createDelayedEvent(nowPlus20SecInstant, "message1", "42");
+        String event = createDelayedEvent(nowPlus20SecInstant, "message1", 1, App.OUTPUT_TOPIC);
         input.pipeInput("111", event);
 
         //then don't publish yet
@@ -82,7 +82,7 @@ class AppTest {
         topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
 
         //then publish it
-        assertEquals(KeyValue.pair("42", "message1"), output.readKeyValue());
+        assertEquals(KeyValue.pair("111", "message1"), output.readKeyValue());
         assertNull(store.get("111"));
 
         //and when
@@ -97,12 +97,9 @@ class AppTest {
         instantMock.verify(times(2), () -> Instant.now(clock));
     }
 
-    private String createDelayedEvent(Instant publishAt, String message, String partitionKey) {
-        return "{" +
-                    "\"type\": \"Delayed\"," +
-                    "\"publishAt\": \""+publishAt+"\"," +
-                    "\"message\": \""+message+"\"," +
-                    "\"partitionKey\": \""+partitionKey+"\"" +
-                "}";
+    private String createDelayedEvent(Instant startAt, String message, int times, String outputTopic) {
+        return "{\"specversion\":\"1.0\",\"id\":\"id1\",\"source\":\"/source\",\"type\":\"DistributedSchedulerEvent\",\"datacontenttype\":\"application/json\",\"dataschema\":null,\"time\":\"2021-12-30T11:54:31.734551Z\"," +
+                "\"data\":{\"serializedJsonData\":\""+message+"\"," +
+                    "\"metaData\":{\"startAt\":\""+startAt+"\",\"times\":"+times+",\"outputTopic\":\""+outputTopic+"\"}}}";
     }
 }
