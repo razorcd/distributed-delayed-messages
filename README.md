@@ -1,12 +1,12 @@
-# distributed-scheduler
+# distributed-delayed-messages
 
-Distributed Scheduler Application to handle event publishing by delaying, repeating, etc events at a particular time to different topics. 
+Distributed Delayed Messages Application to handle event publishing by delaying, repeating, etc events at a particular time to different topics. 
 
 Branch to use Mongo as Custom State store: https://github.com/razorcd/distributed-scheduler/tree/CustomStateStore
 
 ```
-input -> distributed-scheduler -.--> output1
-                                `--> output2
+input -> distributed-delayed-messages -.--> output1
+                                       `--> output2
 ```
 
 ###TODO:
@@ -45,17 +45,23 @@ input -> distributed-scheduler -.--> output1
  - output k/v serializer?
  
  
-### Event:
+### Input event example:
 
 ```json
 {
-  "id":"5010e38c-ff1e-4274-9aaa-b27efd7e5c49",
-  "source":"/myApp",
-  "specversion":"1.0",
-  "type":"eventTypeHere",
-  "time":"2020-12-28T21:57:31.744",
-  "dataschema":null,
-  "datacontenttype":"application/json",
-  "data": "{\"restaurantId\":\"1001\",\"notification\":\"Picking up order at 22:05\"}"
+   "specversion":"1.0",
+   "id":"id1",
+   "source":"/source",
+   "type":"DistributedDelayedMessagesEvent",
+   "datacontenttype":"application/json",
+   "dataschema":null,
+   "time":"2021-12-30T11:54:31.734551Z",
+   "data":{
+      "message":"message0",
+      "metaData":{
+         "startAt":"2021-05-15T21:02:31.333824Z",
+         "outputTopic":"outputTopic1"
+      }
+   }
 }
 ```  

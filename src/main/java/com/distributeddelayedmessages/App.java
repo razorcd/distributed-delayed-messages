@@ -1,7 +1,7 @@
-package com.distributedscheduler;
+package com.distributeddelayedmessages;
 
-import com.distributedscheduler.topology.DistributedSchedulerTransformerSupplier;
-import com.distributedscheduler.topology.TopologyFactory;
+import com.distributeddelayedmessages.topology.DelayedMessagesTransformerSupplier;
+import com.distributeddelayedmessages.topology.TopologyFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
@@ -19,14 +19,14 @@ public class App {
     static final ObjectMapper MAPPER = AppConfig.objectMapper.get();
 
     public static void main(final String[] args) {
-        final String inputTopicName = "distributed-scheduler-input";
-        final List<String> outputTopicNames = Arrays.asList("distributed-scheduler-output1", "distributed-scheduler-output2");
+        final String inputTopicName = "distributed-delayed-messages-input";
+        final List<String> outputTopicNames = Arrays.asList("distributed-delayed-messages-output1", "distributed-delayed-messages-output2");
         final Properties streamsConfiguration = getStreamsConfiguration();
 
 
-        DistributedSchedulerTransformerSupplier distributedSchedulerTransformerSupplier = new DistributedSchedulerTransformerSupplier(CLOCK, new Serde(MAPPER));
+        DelayedMessagesTransformerSupplier delayedMessagesTransformerSupplier = new DelayedMessagesTransformerSupplier(CLOCK, new Serde(MAPPER));
 
-        final TopologyFactory topologyFactory = new TopologyFactory(distributedSchedulerTransformerSupplier);
+        final TopologyFactory topologyFactory = new TopologyFactory(delayedMessagesTransformerSupplier);
         final Topology topology = topologyFactory.build(inputTopicName, outputTopicNames);
         try (KafkaStreams streams = new KafkaStreams(topology, streamsConfiguration)) {
             streams.cleanUp();
@@ -39,8 +39,8 @@ public class App {
     private static Properties getStreamsConfiguration() {
         final Properties streamsConfiguration = new Properties();
 
-        streamsConfiguration.put(StreamsConfig.APPLICATION_ID_CONFIG, "distributed-scheduler-appid");
-        streamsConfiguration.put(StreamsConfig.CLIENT_ID_CONFIG, "distributed-scheduler-clientid");
+        streamsConfiguration.put(StreamsConfig.APPLICATION_ID_CONFIG, "distributed-delayed-messages-appid");
+        streamsConfiguration.put(StreamsConfig.CLIENT_ID_CONFIG, "distributed-delayed-messages-clientid");
 
         streamsConfiguration.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
 

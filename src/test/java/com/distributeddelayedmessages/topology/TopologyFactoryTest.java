@@ -1,7 +1,7 @@
-package com.distributedscheduler.topology;
+package com.distributeddelayedmessages.topology;
 
-import com.distributedscheduler.AppConfig;
-import com.distributedscheduler.Serde;
+import com.distributeddelayedmessages.AppConfig;
+import com.distributeddelayedmessages.Serde;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -52,11 +52,11 @@ class TopologyFactoryTest {
         streamsConfiguration.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy config");
         streamsConfiguration.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         streamsConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
-        streamsConfiguration.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/distributed-scheduler-test");
+        streamsConfiguration.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/distributed-delayed-messages-test");
 
-        DistributedSchedulerTransformerSupplier distributedSchedulerTransformerSupplier = new DistributedSchedulerTransformerSupplier(clock, new Serde(mapper));
+        DelayedMessagesTransformerSupplier delayedMessagesTransformerSupplier = new DelayedMessagesTransformerSupplier(clock, new Serde(mapper));
 
-        final TopologyFactory topologyFactory = new TopologyFactory(distributedSchedulerTransformerSupplier);
+        final TopologyFactory topologyFactory = new TopologyFactory(delayedMessagesTransformerSupplier);
         final Topology topology = topologyFactory.build(inputTopicName, outputTopicNames);
         this.topologyTestDriver = new TopologyTestDriver(topology, streamsConfiguration);
 
@@ -64,7 +64,7 @@ class TopologyFactoryTest {
         outputTopics = outputTopicNames.stream().map(topic -> topologyTestDriver.createOutputTopic(topic, new StringDeserializer(), new StringDeserializer())).collect(Collectors.toList());
 
 
-        store = topologyTestDriver.getKeyValueStore(distributedSchedulerTransformerSupplier.getStateStoreName());
+        store = topologyTestDriver.getKeyValueStore(delayedMessagesTransformerSupplier.getStateStoreName());
     }
 
     @AfterEach
@@ -135,7 +135,7 @@ class TopologyFactoryTest {
     }
 
     private String createDelayedEvent(Instant startAt, String message, String outputTopic) {
-        return "{\"specversion\":\"1.0\",\"id\":\"id1\",\"source\":\"/source\",\"type\":\"DistributedSchedulerEvent\",\"datacontenttype\":\"application/json\",\"dataschema\":null,\"time\":\"2021-12-30T11:54:31.734551Z\"," +
+        return "{\"specversion\":\"1.0\",\"id\":\"id1\",\"source\":\"/source\",\"type\":\"DistributedDelayedMessagesEvent\",\"datacontenttype\":\"application/json\",\"dataschema\":null,\"time\":\"2021-12-30T11:54:31.734551Z\"," +
                 "\"data\":{\"message\":\""+message+"\"," +
                 "\"metaData\":{\"startAt\":\""+startAt+"\",\"outputTopic\":\""+outputTopic+"\"}}}";
     }

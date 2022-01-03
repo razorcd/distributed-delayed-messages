@@ -1,10 +1,10 @@
 <project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0">
         <modelVersion>4.0.0</modelVersion>
-    <groupId>com.distributedscheduler</groupId>
-    <artifactId>distributed-scheduler</artifactId>
+    <groupId>com.distributeddelayedmessages</groupId>
+    <artifactId>distributed-delayed-messages</artifactId>
     <version>0.1</version>
-    <name>distributed-scheduler Application</name>
+    <name>distributed-delayed-messages Application</name>
 	<properties>
         <java.version>11</java.version>
 	</properties>

@@ -1,7 +1,7 @@
-package com.distributedscheduler;
+package com.distributeddelayedmessages;
 
-import com.distributedscheduler.event.CloudEventV1;
-import com.distributedscheduler.event.Data;
+import com.distributeddelayedmessages.event.CloudEventV1;
+import com.distributeddelayedmessages.event.Data;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -25,13 +25,13 @@ class SerdeTest {
         String jsonSerializedEvent = serde.serialize(event);
 
         //when
-        assertThat(jsonSerializedEvent).isEqualTo("{\"specversion\":\"1.0\",\"id\":\"id1\",\"source\":\"/source\",\"type\":\"DistributedSchedulerEvent\",\"datacontenttype\":\"application/json\",\"dataschema\":null,\"time\":\"2021-12-30T11:54:31.734551Z\",\"data\":{\"message\":\"{\\\"test\\\":1}\",\"metaData\":{\"startAt\":\"2021-12-30T11:54:31.734551Z\",\"outputTopic\":\"topic1\"}}}");
+        assertThat(jsonSerializedEvent).isEqualTo("{\"specversion\":\"1.0\",\"id\":\"id1\",\"source\":\"/source\",\"type\":\"DistributedDelayedMessagesEvent\",\"datacontenttype\":\"application/json\",\"dataschema\":null,\"time\":\"2021-12-30T11:54:31.734551Z\",\"data\":{\"message\":\"{\\\"test\\\":1}\",\"metaData\":{\"startAt\":\"2021-12-30T11:54:31.734551Z\",\"outputTopic\":\"topic1\"}}}");
     }
 
     @Test
     void deserializerTest() throws Exception {
         //given
-            String jsonSerializedEvent = "{\"specversion\":\"1.0\",\"id\":\"id1\",\"source\":\"/source\",\"type\":\"DistributedSchedulerEvent\",\"datacontenttype\":\"application/json\",\"dataschema\":null,\"time\":\"2021-12-30T11:54:31.734551Z\",\"data\":{\"message\":\"{\\\"test1\\\":1}\",\"metaData\":{\"startAt\":\"2021-12-30T11:54:31.734551Z\",\"outputTopic\":\"topic1\"}}}";
+            String jsonSerializedEvent = "{\"specversion\":\"1.0\",\"id\":\"id1\",\"source\":\"/source\",\"type\":\"DistributedDelayedMessagesEvent\",\"datacontenttype\":\"application/json\",\"dataschema\":null,\"time\":\"2021-12-30T11:54:31.734551Z\",\"data\":{\"message\":\"{\\\"test1\\\":1}\",\"metaData\":{\"startAt\":\"2021-12-30T11:54:31.734551Z\",\"outputTopic\":\"topic1\"}}}";
 
         //when
         CloudEventV1 deserializedEvent = serde.deserialize(jsonSerializedEvent);
@@ -42,7 +42,7 @@ class SerdeTest {
         CloudEventV1 expectedCloudEvent = new CloudEventV1(
                 "id1",
                 URI.create("/source"),
-                "DistributedSchedulerEvent",
+                "DistributedDelayedMessagesEvent",
                 "application/json",
                 null,
                 Instant.parse("2021-12-30T11:54:31.734551Z"),

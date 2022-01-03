@@ -1,7 +1,7 @@
-package com.distributedscheduler.topology;
+package com.distributeddelayedmessages.topology;
 
 
-import com.distributedscheduler.event.Data;
+import com.distributeddelayedmessages.event.Data;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.KStream;
@@ -12,24 +12,24 @@ import java.util.List;
 
 public class TopologyFactory {
 
-    private final DistributedSchedulerTransformerSupplier distributedSchedulerTransformerSupplier;
+    private final DelayedMessagesTransformerSupplier delayedMessagesTransformerSupplier;
 
 
-    public TopologyFactory(DistributedSchedulerTransformerSupplier distributedSchedulerTransformerSupplier) {
-        this.distributedSchedulerTransformerSupplier = distributedSchedulerTransformerSupplier;
+    public TopologyFactory(DelayedMessagesTransformerSupplier delayedMessagesTransformerSupplier) {
+        this.delayedMessagesTransformerSupplier = delayedMessagesTransformerSupplier;
     }
 
     public Topology build(String inputTopic,
                           List<String> outputTopics) {
         final StreamsBuilder builder = new StreamsBuilder();
 
-        StoreBuilder<KeyValueStore<String, String>> stateStoreBuilder = distributedSchedulerTransformerSupplier.getStateStoreBuilder();
+        StoreBuilder<KeyValueStore<String, String>> stateStoreBuilder = delayedMessagesTransformerSupplier.getStateStoreBuilder();
         builder.addStateStore(stateStoreBuilder);
 
         final KStream<String, String> input = builder.stream(inputTopic);
 
         KStream<String, Data> output = input.peek((k, v) -> System.out.println("Input value k: " + k + ", v: " + v))
-                .transform(distributedSchedulerTransformerSupplier, distributedSchedulerTransformerSupplier.getStateStoreName())
+                .transform(delayedMessagesTransformerSupplier, delayedMessagesTransformerSupplier.getStateStoreName())
                 .filterNot((k, v) -> v == null)
                 .peek((k, v) -> System.out.println("Output value k: " + k + ", v: " + v));
 

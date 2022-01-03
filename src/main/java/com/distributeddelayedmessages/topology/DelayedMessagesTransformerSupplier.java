@@ -1,8 +1,8 @@
-package com.distributedscheduler.topology;
+package com.distributeddelayedmessages.topology;
 
 
-import com.distributedscheduler.Serde;
-import com.distributedscheduler.event.Data;
+import com.distributeddelayedmessages.Serde;
+import com.distributeddelayedmessages.event.Data;
 import lombok.Getter;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
@@ -20,7 +20,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
-public final class DistributedSchedulerTransformerSupplier implements TransformerSupplier<String, String, KeyValue<String, Data>> {
+public final class DelayedMessagesTransformerSupplier implements TransformerSupplier<String, String, KeyValue<String, Data>> {
 
     private static final Duration SCHEDULER_PERIOD = Duration.ofSeconds(10);
 
@@ -31,7 +31,7 @@ public final class DistributedSchedulerTransformerSupplier implements Transforme
     @Getter
     private final String stateStoreName = "distributed-scheduler";
 
-    public DistributedSchedulerTransformerSupplier(final Clock clock, final Serde serde) {
+    public DelayedMessagesTransformerSupplier(final Clock clock, final Serde serde) {
         this.clock = clock;
         this.serde = serde;
     }

@@ -1,7 +1,7 @@
-package com.distributedscheduler;
+package com.distributeddelayedmessages;
 
-import com.distributedscheduler.event.CloudEventV1;
-import com.distributedscheduler.event.Data;
+import com.distributeddelayedmessages.event.CloudEventV1;
+import com.distributeddelayedmessages.event.Data;
 import lombok.RequiredArgsConstructor;
 
 import java.net.URI;
@@ -14,13 +14,12 @@ public class EventBuilder {
 
 
     public CloudEventV1 buildEvent(String serializedStringData, Data.MetaData metaData) {
-//        DistributedSchedulerMetaData metaData = new DistributedSchedulerMetaData(clock.instant(), 1, "topic1");
         Data data = new Data(serializedStringData, metaData);
 
         return new CloudEventV1(
                 "id1",
                 URI.create("/source"),
-                "DistributedSchedulerEvent",
+                "DistributedDelayedMessagesEvent",
                 "application/json",
                 null,
                 clock.instant(),

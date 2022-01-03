@@ -1,6 +1,6 @@
-package com.distributedscheduler;
+package com.distributeddelayedmessages;
 
-import com.distributedscheduler.event.CloudEventV1;
+import com.distributeddelayedmessages.event.CloudEventV1;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

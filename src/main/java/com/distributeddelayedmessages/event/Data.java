@@ -1,4 +1,4 @@
-package com.distributedscheduler.event;
+package com.distributeddelayedmessages.event;
 
 
 import lombok.NoArgsConstructor;
