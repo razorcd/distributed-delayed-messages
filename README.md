@@ -1,6 +1,7 @@
 # distributed-delayed-messages
 
-Distributed Delayed Messages Application to handle event publishing by delaying, repeating, etc events at a particular time to different topics. 
+Distributed Delayed Messages Application to handle event publishing by delaying events at a particular time to different topics. 
+Application uses kafka-streams to distribute load over multiple instances.
 
 Branch to use Mongo as Custom State store: https://github.com/razorcd/distributed-scheduler/tree/CustomStateStore
 
