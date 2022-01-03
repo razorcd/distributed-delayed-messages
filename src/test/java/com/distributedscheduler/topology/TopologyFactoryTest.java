@@ -1,5 +1,8 @@
-package com.distributedscheduler;
+package com.distributedscheduler.topology;
 
+import com.distributedscheduler.AppConfig;
+import com.distributedscheduler.Serde;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -13,6 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoField;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
@@ -22,14 +26,20 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 
-class AppTest {
+class TopologyFactoryTest {
     Instant now = Instant.parse("2021-05-15T21:02:11.333824Z");
     Clock clock = Clock.fixed(now, ZoneId.of("UTC"));
+    ObjectMapper mapper = AppConfig.objectMapper.get();
 
     TestInputTopic<String, String> input;
+    String inputTopicName = "topicInput1";
+
     List<TestOutputTopic<String, String>> outputTopics;
+    List<String> outputTopicNames = Arrays.asList("outputTopic1", "outputTopic2");
+
     TopologyTestDriver topologyTestDriver;
     KeyValueStore<String, String> store;
+
 
     @BeforeAll
     static void beforeAll() throws Exception {
@@ -44,9 +54,14 @@ class AppTest {
         streamsConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         streamsConfiguration.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/distributed-scheduler-test");
 
-        this.topologyTestDriver = new TopologyTestDriver(App.getTopology(clock), streamsConfiguration);
-        input = topologyTestDriver.createInputTopic(App.INPUT_TOPIC, new StringSerializer(), new StringSerializer(), Instant.EPOCH, Duration.ofMillis(1));
-        outputTopics = App.OUTPUT_TOPICS.stream().map(topic -> topologyTestDriver.createOutputTopic(topic, new StringDeserializer(), new StringDeserializer())).collect(Collectors.toList());
+        DistributedSchedulerTransformerSupplier distributedSchedulerTransformerSupplier = new DistributedSchedulerTransformerSupplier(clock, new Serde(mapper));
+
+        final TopologyFactory topologyFactory = new TopologyFactory(distributedSchedulerTransformerSupplier);
+        final Topology topology = topologyFactory.build(inputTopicName, outputTopicNames);
+        this.topologyTestDriver = new TopologyTestDriver(topology, streamsConfiguration);
+
+        input = topologyTestDriver.createInputTopic(inputTopicName, new StringSerializer(), new StringSerializer(), Instant.EPOCH, Duration.ofMillis(1));
+        outputTopics = outputTopicNames.stream().map(topic -> topologyTestDriver.createOutputTopic(topic, new StringDeserializer(), new StringDeserializer())).collect(Collectors.toList());
 
 
         store = topologyTestDriver.getKeyValueStore("distributed-scheduler-store");
@@ -70,9 +85,9 @@ class AppTest {
         long nowPlus30Sec = nowPlus30SecInstant.getEpochSecond();
 
         //when
-        String event0 = createDelayedEvent(nowPlus20SecInstant, "message0", App.OUTPUT_TOPICS.get(0));
-        String event0a = createDelayedEvent(nowPlus20SecInstant, "message0again", App.OUTPUT_TOPICS.get(0));
-        String event1 = createDelayedEvent(nowPlus30SecInstant, "message1", App.OUTPUT_TOPICS.get(1));
+        String event0 = createDelayedEvent(nowPlus20SecInstant, "message0", outputTopicNames.get(0));
+        String event0a = createDelayedEvent(nowPlus20SecInstant, "message0again", outputTopicNames.get(0));
+        String event1 = createDelayedEvent(nowPlus30SecInstant, "message1", outputTopicNames.get(1));
         input.pipeInput("000", event0);
         input.pipeInput("000", event0a);
         input.pipeInput("111", event1);
@@ -94,7 +109,7 @@ class AppTest {
 
         //then publish it
         assertEquals(KeyValue.pair("000", "message0again"), outputTopics.get(0).readKeyValue());
-        assertTrue(outputTopics.get(1).isEmpty());
+        assertTrue(outputTopicNames.get(1).isEmpty());
         assertNull(store.get("000"));
         assertNotNull(store.get("111"));
 
@@ -103,7 +118,7 @@ class AppTest {
         topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
 
         //then publish it
-        assertTrue(outputTopics.get(0).isEmpty());
+        assertTrue(outputTopicNames.get(0).isEmpty());
         assertEquals(KeyValue.pair("111", "message1"), outputTopics.get(1).readKeyValue());
         assertNull(store.get("111"));
 
@@ -122,6 +137,6 @@ class AppTest {
     private String createDelayedEvent(Instant startAt, String message, String outputTopic) {
         return "{\"specversion\":\"1.0\",\"id\":\"id1\",\"source\":\"/source\",\"type\":\"DistributedSchedulerEvent\",\"datacontenttype\":\"application/json\",\"dataschema\":null,\"time\":\"2021-12-30T11:54:31.734551Z\"," +
                 "\"data\":{\"message\":\""+message+"\"," +
-                    "\"metaData\":{\"startAt\":\""+startAt+"\",\"outputTopic\":\""+outputTopic+"\"}}}";
+                "\"metaData\":{\"startAt\":\""+startAt+"\",\"outputTopic\":\""+outputTopic+"\"}}}";
     }
 }
