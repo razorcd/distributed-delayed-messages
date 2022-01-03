@@ -65,25 +65,41 @@ class AppTest {
     void givenEmptyStore_whenReceivingEventsWithPublishOnceAtStartTime_shouldEmitMessageOnceAtStartTime() throws InterruptedException {
         Instant nowPlus20SecInstant = now.plusSeconds(20);
         Instant nowPlus30SecInstant = now.plusSeconds(30);
+        Instant nowPlus31SecInstant = now.plusSeconds(31);
         long nowPlus20Sec = nowPlus20SecInstant.getEpochSecond();
+        long nowPlus30Sec = nowPlus30SecInstant.getEpochSecond();
 
         //when
-        String event0 = createDelayedEvent(nowPlus20SecInstant, "message0", 1, App.OUTPUT_TOPICS.get(1));
-        String event1 = createDelayedEvent(nowPlus20SecInstant, "message1", 1, App.OUTPUT_TOPICS.get(1));
-        input.pipeInput("111", event0);
+        String event0 = createDelayedEvent(nowPlus20SecInstant, "message0", App.OUTPUT_TOPICS.get(0));
+        String event0a = createDelayedEvent(nowPlus20SecInstant, "message0again", App.OUTPUT_TOPICS.get(0));
+        String event1 = createDelayedEvent(nowPlus30SecInstant, "message1", App.OUTPUT_TOPICS.get(1));
+        input.pipeInput("000", event0);
+        input.pipeInput("000", event0a);
         input.pipeInput("111", event1);
 
         //then don't publish yet
         MockedStatic instantMock = mockStatic(Instant.class);
         instantMock.when(() -> Instant.from(argThat(temporal -> temporal.getLong(ChronoField.INSTANT_SECONDS)==nowPlus20Sec))).thenReturn(nowPlus20SecInstant); //for json deserializer
+        instantMock.when(() -> Instant.from(argThat(temporal -> temporal.getLong(ChronoField.INSTANT_SECONDS)==nowPlus30Sec))).thenReturn(nowPlus30SecInstant); //for json deserializer
 
         instantMock.when(() -> Instant.now(clock)).thenReturn(now);
         topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
         assertTrue(outputTopics.stream().allMatch(TestOutputTopic::isEmpty));
+        assertNotNull(store.get("000"));
         assertNotNull(store.get("111"));
 
         //and when
         instantMock.when(() -> Instant.now(clock)).thenReturn(nowPlus20SecInstant);
+        topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
+
+        //then publish it
+        assertEquals(KeyValue.pair("000", "message0again"), outputTopics.get(0).readKeyValue());
+        assertTrue(outputTopics.get(1).isEmpty());
+        assertNull(store.get("000"));
+        assertNotNull(store.get("111"));
+
+        //and when
+        instantMock.when(() -> Instant.now(clock)).thenReturn(nowPlus30SecInstant);
         topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
 
         //then publish it
@@ -92,20 +108,20 @@ class AppTest {
         assertNull(store.get("111"));
 
         //and when
-        instantMock.when(() -> Instant.now(clock)).thenReturn(nowPlus30SecInstant);
-        topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
+        instantMock.when(() -> Instant.now(clock)).thenReturn(nowPlus31SecInstant);
+        topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(1));
 
         //then publish nothing else
         assertTrue(outputTopics.stream().allMatch(TestOutputTopic::isEmpty));
-        assertNull(store.get("111"));
+        assertFalse(store.all().hasNext());
 
         //finally
-        instantMock.verify(times(2), () -> Instant.now(clock));
+        instantMock.verify(times(5), () -> Instant.now(clock));
     }
 
-    private String createDelayedEvent(Instant startAt, String message, int times, String outputTopic) {
+    private String createDelayedEvent(Instant startAt, String message, String outputTopic) {
         return "{\"specversion\":\"1.0\",\"id\":\"id1\",\"source\":\"/source\",\"type\":\"DistributedSchedulerEvent\",\"datacontenttype\":\"application/json\",\"dataschema\":null,\"time\":\"2021-12-30T11:54:31.734551Z\"," +
-                "\"data\":{\"serializedJsonData\":\""+message+"\"," +
-                    "\"metaData\":{\"startAt\":\""+startAt+"\",\"times\":"+times+",\"outputTopic\":\""+outputTopic+"\"}}}";
+                "\"data\":{\"message\":\""+message+"\"," +
+                    "\"metaData\":{\"startAt\":\""+startAt+"\",\"outputTopic\":\""+outputTopic+"\"}}}";
     }
 }

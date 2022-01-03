@@ -11,7 +11,7 @@ import java.time.Instant;
 @NoArgsConstructor(force = true)
 @RequiredArgsConstructor
 public class Data {
-    String serializedJsonData;
+    String message;
     MetaData metaData;
 
 
@@ -20,7 +20,7 @@ public class Data {
     @RequiredArgsConstructor
     public static class MetaData {
         Instant startAt;
-        Integer times;
+//        Integer times;
         String outputTopic;
     }
 }

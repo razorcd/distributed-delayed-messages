@@ -81,7 +81,7 @@ public class App {
                 output.filter((k,v) ->
                         topic
                         .equals(v.getMetaData().getOutputTopic()))
-                        .mapValues((k,v) -> v.getSerializedJsonData())
+                        .mapValues((k,v) -> v.getMessage())
                         .to(topic)
         );
 
