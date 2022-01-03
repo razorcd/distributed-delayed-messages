@@ -9,14 +9,14 @@ input -> distributed-delayed-messages -.--> output1
                                        `--> output2
 ```
 
-###TODO:
+### TODO:
  - [x] add cloud events
  - [ ] add load tests
  - [x] add multiple topics
  - [ ] integrate different stores
  - [ ] implement all Ideas
  
-###Ideas for events behavior:
+### Ideas for events behavior:
 
 ##### When to start publishing: 
  - delay message by X minutes/s/ms..
