@@ -18,22 +18,31 @@ public class App {
     static final Clock CLOCK = AppConfig.clock;
     static final ObjectMapper MAPPER = AppConfig.objectMapper.get();
 
-
-    static final String INPUT_TOPIC = "distributed-scheduler-input";
-    static final List<String> OUTPUT_TOPICS = Arrays.asList("distributed-scheduler-output1", "distributed-scheduler-output2");
-
-
-
     public static void main(final String[] args) {
+        final String inputTopicName = "distributed-scheduler-input";
+        final List<String> outputTopicNames = Arrays.asList("distributed-scheduler-output1", "distributed-scheduler-output2");
+        final Properties streamsConfiguration = getStreamsConfiguration();
 
 
-        final String bootstrapServers = args.length > 0 ? args[0] : "localhost:9092";
+        DistributedSchedulerTransformerSupplier distributedSchedulerTransformerSupplier = new DistributedSchedulerTransformerSupplier(CLOCK, new Serde(MAPPER));
+
+        final TopologyFactory topologyFactory = new TopologyFactory(distributedSchedulerTransformerSupplier);
+        final Topology topology = topologyFactory.build(inputTopicName, outputTopicNames);
+        try (KafkaStreams streams = new KafkaStreams(topology, streamsConfiguration)) {
+            streams.cleanUp();
+            streams.start();
+            Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
+        }
+    }
+
+
+    private static Properties getStreamsConfiguration() {
         final Properties streamsConfiguration = new Properties();
 
         streamsConfiguration.put(StreamsConfig.APPLICATION_ID_CONFIG, "distributed-scheduler-appid");
         streamsConfiguration.put(StreamsConfig.CLIENT_ID_CONFIG, "distributed-scheduler-clientid");
 
-        streamsConfiguration.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        streamsConfiguration.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
 
         streamsConfiguration.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         streamsConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
@@ -42,19 +51,6 @@ public class App {
         streamsConfiguration.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/kafka-streams2");
 
         streamsConfiguration.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 10 * 1000);
-
-
-        DistributedSchedulerTransformerSupplier distributedSchedulerTransformerSupplier = new DistributedSchedulerTransformerSupplier(CLOCK, new Serde(MAPPER));
-
-        final TopologyFactory topologyFactory = new TopologyFactory(distributedSchedulerTransformerSupplier);
-        final Topology topology = topologyFactory.build(INPUT_TOPIC, OUTPUT_TOPICS);
-        final KafkaStreams streams = new KafkaStreams(topology, streamsConfiguration);
-
-        streams.cleanUp();
-        streams.start();
-
-        Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
+        return streamsConfiguration;
     }
-
-
 }

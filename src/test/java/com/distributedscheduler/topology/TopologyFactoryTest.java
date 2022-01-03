@@ -64,7 +64,7 @@ class TopologyFactoryTest {
         outputTopics = outputTopicNames.stream().map(topic -> topologyTestDriver.createOutputTopic(topic, new StringDeserializer(), new StringDeserializer())).collect(Collectors.toList());
 
 
-        store = topologyTestDriver.getKeyValueStore("distributed-scheduler-store");
+        store = topologyTestDriver.getKeyValueStore(distributedSchedulerTransformerSupplier.getStateStoreName());
     }
 
     @AfterEach
@@ -109,7 +109,7 @@ class TopologyFactoryTest {
 
         //then publish it
         assertEquals(KeyValue.pair("000", "message0again"), outputTopics.get(0).readKeyValue());
-        assertTrue(outputTopicNames.get(1).isEmpty());
+        assertTrue(outputTopics.get(1).isEmpty());
         assertNull(store.get("000"));
         assertNotNull(store.get("111"));
 
@@ -118,7 +118,7 @@ class TopologyFactoryTest {
         topologyTestDriver.advanceWallClockTime(Duration.ofSeconds(10));
 
         //then publish it
-        assertTrue(outputTopicNames.get(0).isEmpty());
+        assertTrue(outputTopics.get(0).isEmpty());
         assertEquals(KeyValue.pair("111", "message1"), outputTopics.get(1).readKeyValue());
         assertNull(store.get("111"));
 
