@@ -19,6 +19,7 @@ public class App {
     static final ObjectMapper MAPPER = AppConfig.objectMapper.get();
 
     public static void main(final String[] args) {
+        System.out.println("Starting APP");
         final String inputTopicName = "distributed-delayed-messages-input";
         final List<String> outputTopicNames = Arrays.asList("distributed-delayed-messages-output1", "distributed-delayed-messages-output2");
         final Properties streamsConfiguration = getStreamsConfiguration();
